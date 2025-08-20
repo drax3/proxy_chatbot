@@ -11,4 +11,5 @@ django-cors-headers
 pyJWT
 pytz
 asgiref
+gunicorn
 sqlparse
