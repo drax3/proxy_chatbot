@@ -9,6 +9,9 @@ from users.serializers import ProfileSerializer
 
 from .tasks import send_message_to_gemini
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 User = get_user_model()
 
 class ChatRoomListCreateView(generics.ListCreateAPIView):
@@ -54,4 +57,13 @@ class MessageListCreateView(generics.ListCreateAPIView):
             "task_id": async_result.id,
             "status": "queued",
         }
+        #broadcast to websocket group
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"room_{room_id}",
+            {
+                "type": "chat_message",
+                "payload": MessageSerializer(user_message).data,
+            }
+        )
         return Response(payload, status=status.HTTP_202_ACCEPTED)

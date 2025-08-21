@@ -8,6 +8,8 @@ from django.utils import timezone
 from .models import ChatRoom, Message
 from .gemini_client import generate_gemini_reply
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
 def send_message_to_gemini(self, room_id: int, user_message_id: int):
@@ -40,7 +42,22 @@ def send_message_to_gemini(self, room_id: int, user_message_id: int):
             content=reply_text,
             timestamp=timezone.now(),
         )
-
+        # Broadcast to websocket group
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"room_{room.id}",
+            {
+                "type": "chat_message",
+                "payload": {
+                    "id": ai_msg.id,
+                    "room": room.id,
+                    "sender": None,
+                    "role": ai_msg.role,
+                    "content": ai_msg.content,
+                    "timestamp": ai_msg.timestamp.isoformat(),
+                },
+            }
+        )
     return {
         "room_id": room_id,
         "user_message_id": user_message_id,
