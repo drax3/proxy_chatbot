@@ -1,0 +1,63 @@
+{% extends "frontend/base.html" %}
+{% block title %}Rooms{% endblock %}
+{% block content %}
+<div class="flex items-start gap-6">
+  <div class="w-2/3">
+    <h1 class="text-xl font-semibold mb-3">Chat Rooms</h1>
+    <div id="roomList" class="space-y-2"></div>
+  </div>
+  <div class="w-1/3">
+    <div class="bg-white border rounded p-4">
+      <h2 class="font-medium mb-2">Create Room</h2>
+      <form id="roomForm" class="space-y-2">
+        <input id="roomName" class="w-full border rounded px-3 py-2" placeholder="Room name" required />
+        <button class="w-full bg-black text-white px-3 py-2 rounded hover:opacity-90">Create</button>
+      </form>
+      <p id="roomError" class="text-sm text-red-600 mt-2 hidden"></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuthOrRedirect();
+
+  async function loadRooms() {
+    const res = await fetch("/api/chatrooms/", {
+      headers: authHeaders()
+    });
+    if (!res.ok) {
+      if (res.status === 401) return redirectToLogin();
+      return;
+    }
+    const data = await res.json();
+    const container = document.getElementById("roomList");
+    container.innerHTML = data.map(r => `
+      <a href="/chat/${r.id}/" class="block bg-white border rounded px-4 py-3 hover:bg-gray-50">
+        <div class="font-medium">${r.name}</div>
+        <div class="text-xs text-gray-500">Created by: ${r.created_by?.username || "unknown"}</div>
+      </a>
+    `).join("");
+  }
+
+  document.getElementById("roomForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = document.getElementById("roomName").value.trim();
+    const res = await fetch("/api/chatrooms/", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) {
+      document.getElementById("roomError").classList.remove("hidden");
+      document.getElementById("roomError").textContent = "Failed to create room";
+      return;
+    }
+    document.getElementById("roomName").value = "";
+    loadRooms();
+  });
+
+  loadRooms();
+</script>
+{% endblock %}

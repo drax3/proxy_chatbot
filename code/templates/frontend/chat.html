@@ -1,0 +1,100 @@
+{% extends "frontend/base.html" %}
+{% block title %}Chat{% endblock %}
+{% block content %}
+<div class="bg-white border rounded-lg overflow-hidden">
+  <div id="roomHeader" class="px-4 py-3 border-b font-medium">Room</div>
+
+  <div id="messages" class="h-[60vh] overflow-y-auto p-4 space-y-3 bg-gray-50"></div>
+
+  <form id="sendForm" class="flex gap-2 p-3 border-t bg-white">
+    <input id="msgInput" class="flex-1 border rounded px-3 py-2" placeholder="Type a message" autocomplete="off" />
+    <button class="bg-black text-white px-4 py-2 rounded">Send</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  requireAuthOrRedirect();
+
+  // Extract room_id from URL (/chat/<id>/)
+  const roomId = parseInt(window.location.pathname.split("/").filter(Boolean).pop(), 10);
+  const access = getToken();
+  const wsScheme = location.protocol === "https:" ? "wss" : "ws";
+  const wsUrl = `${wsScheme}://${location.host}/ws/chat/${roomId}/?token=${encodeURIComponent(access)}`;
+
+  const $messages = document.getElementById("messages");
+
+  function renderMessage(m) {
+    const isUser = m.role === "user";
+    const who = isUser ? (m.sender?.username || "you") : "AI";
+    const align = isUser ? "items-end" : "items-start";
+    const bubble = isUser ? "bg-black text-white" : "bg-white border";
+    const time = new Date(m.timestamp).toLocaleTimeString();
+    return `
+      <div class="flex ${align}">
+        <div class="max-w-[80%] rounded px-3 py-2 ${bubble}">
+          <div class="text-xs opacity-70 mb-1">${who} • ${time}</div>
+          <div class="whitespace-pre-wrap">${escapeHtml(m.content)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function loadHistory() {
+    const res = await fetch(`/api/chatrooms/${roomId}/messages/`, {
+      headers: authHeaders()
+    });
+    if (!res.ok) {
+      if (res.status === 401) return redirectToLogin();
+      return;
+    }
+    const data = await res.json();
+    $messages.innerHTML = data.map(renderMessage).join("");
+    $messages.scrollTop = $messages.scrollHeight;
+  }
+
+  // Open WebSocket for live updates
+  let socket;
+  function connectWS() {
+    socket = new WebSocket(wsUrl);
+    socket.onopen = () => {};
+    socket.onmessage = (evt) => {
+      const payload = JSON.parse(evt.data);
+      // The consumer broadcasts payload compatible with MessageSerializer
+      $messages.insertAdjacentHTML("beforeend", renderMessage(payload));
+      $messages.scrollTop = $messages.scrollHeight;
+    };
+    socket.onclose = () => {
+      // simple retry after a delay
+      setTimeout(connectWS, 1500);
+    };
+  }
+
+  // Send via REST so Celery gets triggered (and backend broadcasts to WS)
+  document.getElementById("sendForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const content = document.getElementById("msgInput").value.trim();
+    if (!content) return;
+
+    const res = await fetch(`/api/chatrooms/${roomId}/messages/`, {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ content })
+    });
+
+    if (res.ok) {
+      document.getElementById("msgInput").value = "";
+      // The server will broadcast the user's message right away via WS
+      // Then Celery will enqueue Gemini and broadcast AI reply when ready.
+    }
+  });
+
+  // Initialize
+  (async function init() {
+    document.getElementById("roomHeader").textContent = `Room #${roomId}`;
+    await loadHistory();
+    connectWS();
+  })();
+</script>
+{% endblock %}

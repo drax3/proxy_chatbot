@@ -1,0 +1,30 @@
+<!doctype html>
+{% load static %}
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}Chat{% endblock %}</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/frontend/styles.css" />
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <header class="border-b bg-white">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="font-semibold">DRF + Channels Chat</a>
+      <nav class="flex items-center gap-4">
+        <a href="/rooms/" class="text-sm hover:underline">Rooms</a>
+        <button id="logoutBtn" class="text-sm text-red-600 hover:underline">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="/static/frontend/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

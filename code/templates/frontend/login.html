@@ -1,0 +1,71 @@
+{% extends "frontend/base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="max-w-md mx-auto bg-white border rounded-lg p-6 shadow-sm">
+  <h1 class="text-xl font-semibold mb-4">Sign in</h1>
+  <p class="text-sm text-gray-600 mb-4">Use the demo register endpoint first if needed.</p>
+
+  <form id="loginForm" class="space-y-3">
+    <div>
+      <label class="block text-sm mb-1">email</label>
+      <input id="email" class="w-full border rounded px-3 py-2" required />
+    </div>
+    <div>
+      <label class="block text-sm mb-1">Password</label>
+      <input id="password" type="password" class="w-full border rounded px-3 py-2" required />
+    </div>
+    <button class="w-full bg-black text-white px-3 py-2 rounded hover:opacity-90">Login</button>
+  </form>
+
+  <div class="mt-4 text-sm">
+    <button id="registerDemo" class="underline">Create demo user</button>
+  </div>
+
+  <p id="loginError" class="text-sm text-red-600 mt-3 hidden"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // If already logged in, go to rooms
+  if (getToken()) window.location.href = "/rooms/";
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      email: document.getElementById("email").value.trim(),
+      password: document.getElementById("password").value.trim()
+    };
+    const res = await fetch("/api/token/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      document.getElementById("loginError").classList.remove("hidden");
+      document.getElementById("loginError").textContent = "Invalid credentials";
+      return;
+    }
+    const data = await res.json();
+    setToken(data.access);
+    window.location.href = "/rooms/";
+  });
+
+  document.getElementById("registerDemo").addEventListener("click", async () => {
+    const uname = "user" + Math.floor(Math.random()*10000);
+    const pwd = "pass1234";
+    const res = await fetch("/api/auth/register/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: uname, password: pwd })
+    });
+    if (res.ok) {
+      alert(`Created user:\nemail: ${uname}\npassword: ${pwd}`);
+      document.getElementById("email").value = uname;
+      document.getElementById("password").value = pwd;
+    } else {
+      alert("Register failed");
+    }
+  });
+</script>
+{% endblock %}
